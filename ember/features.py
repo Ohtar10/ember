@@ -147,15 +147,15 @@ class SectionInfo(FeatureType):
             if int(LIEF_MAJOR) > 0 or (int(LIEF_MAJOR) == 0 and int(LIEF_MINOR) >= 12):
                 section = lief_binary.section_from_rva(lief_binary.entrypoint - lief_binary.imagebase)
                 if section is None:
-                    raise lief.not_found
+                    raise lief.lief_errors.not_found
                 entry_section = section.name
             else: # lief < 0.12
                 entry_section = lief_binary.section_from_offset(lief_binary.entrypoint).name
-        except lief.not_found:
+        except lief.lief_errors.not_found:
                 # bad entry point, let's find the first executable section
                 entry_section = ""
                 for s in lief_binary.sections:
-                    if lief.PE.SECTION_CHARACTERISTICS.MEM_EXECUTE in s.characteristics_lists:
+                    if lief.PE.Section.CHARACTERISTICS.MEM_EXECUTE in s.characteristics_lists:
                         entry_section = s.name
                         break
 
@@ -516,29 +516,29 @@ class PEFeatureExtractor(object):
         else:
             self.features = list(features.values())
 
+        from importlib.metadata import version
+        lief_version = version("lief")
         if feature_version == 1:
-            if not lief.__version__.startswith("0.8.3"):
+            if not lief_version.startswith("0.8.3"):
                 if print_feature_warning:
                     print(f"WARNING: EMBER feature version 1 were computed using lief version 0.8.3-18d5b75")
-                    print(f"WARNING:   lief version {lief.__version__} found instead. There may be slight inconsistencies")
+                    print(f"WARNING:   lief version {lief_version} found instead. There may be slight inconsistencies")
                     print(f"WARNING:   in the feature calculations.")
         elif feature_version == 2:
             self.features.append(DataDirectories())
-            if not lief.__version__.startswith("0.9.0"):
+            if not lief_version.startswith("0.9.0"):
                 if print_feature_warning:
                     print(f"WARNING: EMBER feature version 2 were computed using lief version 0.9.0-")
-                    print(f"WARNING:   lief version {lief.__version__} found instead. There may be slight inconsistencies")
+                    print(f"WARNING:   lief version {lief_version} found instead. There may be slight inconsistencies")
                     print(f"WARNING:   in the feature calculations.")
         else:
             raise Exception(f"EMBER feature version must be 1 or 2. Not {feature_version}")
         self.dim = sum([fe.dim for fe in self.features])
 
     def raw_features(self, bytez):
-        lief_errors = (lief.bad_format, lief.bad_file, lief.pe_error, lief.parser_error, lief.read_out_of_bound,
-                       RuntimeError)
         try:
             lief_binary = lief.PE.parse(list(bytez))
-        except lief_errors as e:
+        except RuntimeError as e:
             print("lief error: ", str(e))
             lief_binary = None
         except Exception:  # everything else (KeyboardInterrupt, SystemExit, ValueError):
